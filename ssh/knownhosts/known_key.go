@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"log"
 	"strings"
 
 	"golang.org/x/crypto/ssh"
@@ -68,11 +69,14 @@ func ParseKnownHosts(s string) ([]KnownKey, error) {
 // Matches checks if the specified host is present and if the fingerprint matches
 // the present public key key.
 func (k KnownKey) Matches(host string, fingerprint []byte, hasher hash.Hash) bool {
+	log.Printf("[knownkey matches] hosts: %v", k.hosts)
 	if !containsHost(k.hosts, host) {
 		return false
 	}
 	hasher.Write(k.key.Marshal())
-	return bytes.Equal(hasher.Sum(nil), fingerprint)
+	hashedPK := hasher.Sum(nil)
+	log.Printf("[knownkey matches] hashed pk: %s", base64.RawURLEncoding.EncodeToString(hashedPK))
+	return bytes.Equal(hashedPK, fingerprint)
 }
 
 func containsHost(hosts []string, host string) bool {
