@@ -16,41 +16,59 @@ fi
 
 PROJECT_DIR=$(git rev-parse --show-toplevel)
 
-# Check and reuse any existing gitlab container.
-CONTAINER_ID=$(docker ps -f name=${CONTAINER_NAME} -q)
-if [[ -z "${CONTAINER_ID}" ]]; then
-    echo "Creating gitlab container with image ${CONTAINER_IMAGE}..."
-    docker run --detach \
-    --hostname 127.0.0.1 \
-    --publish 8080:80 --publish 2222:22 \
-    --name ${CONTAINER_NAME} \
-    --shm-size 256m \
-    ${CONTAINER_IMAGE}
-else
-    echo "Running tests against existing gitlab container $CONTAINER_ID ..."
-fi
-
-echo "Waiting for GitLab to be ready..."
-ok=false
-retries=30
-count=0
-until ${ok}; do
-    status=$(docker inspect ${CONTAINER_NAME} -f '{{.State.Health.Status}}')
-    if [[ "$status" = "healthy" ]]; then
-        ok=true
+function create_gitlab_container {
+    # Check and reuse any existing gitlab container.
+    CONTAINER_ID=$(docker ps -f name=${CONTAINER_NAME} -q)
+    if [[ -z "${CONTAINER_ID}" ]]; then
+        echo "Creating gitlab container with image ${CONTAINER_IMAGE}..."
+        docker run --detach \
+        --hostname 127.0.0.1 \
+        --publish 8080:80 --publish 2222:22 \
+        --name ${CONTAINER_NAME} \
+        --shm-size 256m \
+        ${CONTAINER_IMAGE}
     else
-        sleep 10
+        echo "Running tests against existing gitlab container $CONTAINER_ID ..."
     fi
-    count=$(($count + 1))
-    if [[ ${count} -eq ${retries} ]]; then
-        echo "Timed out waiting for GitLab container to be healthy"
-        exit 1
-    fi
-done
-echo "GitLab container is healthy"
+
+    echo "Waiting for GitLab to be ready..."
+    ok=false
+    retries=30
+    count=0
+    until ${ok}; do
+        status=$(docker inspect ${CONTAINER_NAME} -f '{{.State.Health.Status}}')
+        if [[ "$status" = "healthy" ]]; then
+            ok=true
+        else
+            sleep 10
+        fi
+        count=$(($count + 1))
+        if [[ ${count} -eq ${retries} ]]; then
+            echo "Timed out waiting for GitLab container to be healthy"
+            exit 1
+        fi
+    done
+    echo "GitLab container is healthy"
+}
+
+function copy_password {
+    password=$(docker exec ${CONTAINER_NAME} grep 'Password:' /etc/gitlab/initial_root_password | sed "s/Password: //g")
+    echo ${password}
+}
+
+create_gitlab_container
 
 # Grab the root password
-password=$(docker exec ${CONTAINER_NAME} grep 'Password:' /etc/gitlab/initial_root_password | sed "s/Password: //g")
+password="$(copy_password)"
+if [[ ! "$password" ]]; then
+    # The root passowrd file is deleted after 24 hours of Gitlab starting
+    # https://docs.gitlab.com/ee/install/docker.html#installation
+    echo "Root password no longer available, retrying with a new container..."
+    docker stop ${CONTAINER_NAME} > /dev/null
+    docker rm ${CONTAINER_NAME} > /dev/null
+    create_gitlab_container
+    password="$(copy_password)"
+fi
 
 # Register a PAT for the root user.
 echo "Registering new PAT..."
