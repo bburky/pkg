@@ -11,13 +11,15 @@ locals {
 }
 
 module "gke" {
-  source = "git::https://github.com/fluxcd/test-infra.git//tf-modules/gcp/gke"
+  source = "git::https://github.com/fluxcd/test-infra.git//tf-modules/gcp/gke?ref=tf-resource-tags"
 
   name = local.name
+  tags = var.tags
 }
 
 module "gcr" {
-  source = "git::https://github.com/fluxcd/test-infra.git//tf-modules/gcp/gcr"
+  source = "git::https://github.com/fluxcd/test-infra.git//tf-modules/gcp/gcr?ref=tf-resource-tags"
 
   name = local.name
+  tags = var.tags
 }
