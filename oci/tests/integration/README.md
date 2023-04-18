@@ -60,9 +60,25 @@ $ kubectl logs test-job-93tbl-4jp2r
 
 - GCP account with project and GKE, GCR and Artifact Registry services enabled
     in the project.
-- gcloud CLI, need to be logged in using `gcloud auth login`, configure
-  application default credentials with `gcloud auth application-default login`
-  and docker credential helper with `gcloud auth configure-docker`.
+- gcloud CLI, need to be logged in using `gcloud auth login` as a User (not a
+  Service Account), configure application default credentials with `gcloud auth
+  application-default login` and docker credential helper with `gcloud auth configure-docker`.
+
+  **NOTE:** To use Service Account (for example in CI environment), set
+  `GOOGLE_APPLICATION_CREDENTIALS` variable in `.env` with the path to the JSON
+  key file, source it and authenticate gcloud CLI with:
+  ```console
+  $ gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+  ```
+  Depending on the Container/Artifact Registry host used in the test, authenticate
+  docker accordingly
+  ```console
+  $ gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://us-central1-docker.pkg.dev
+  $ gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://gcr.io
+  ```
+  In this case, the GCP client in terraform uses the Service Account to
+  authenticate and the gcloud CLI is used only to authenticate with Google
+  Container Registry and Google Artifact Registry.
 - Docker CLI for registry login.
 - kubectl for applying certain install manifests.
 
